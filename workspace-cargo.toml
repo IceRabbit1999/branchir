@@ -6,3 +6,4 @@ members = ["crates/*"]
 
 [dependencies]
 ir_aquila = "0.0.2"
+snafu = "0.8.5"

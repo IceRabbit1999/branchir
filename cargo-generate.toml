@@ -4,12 +4,12 @@
 use_workspace = { type = "bool", prompt = "Do you want to create a workspace-style project?", default = true }
 
 [conditional.'use_workspace == true']
-ignore = ["target", "src", "Cargo.toml", "README.md"]
+ignore = ["target", "src", "Cargo.toml", "README.md", "LICENSE-MIT", "LICENSE-APACHE"]
 include = [ "crates/**/*", "workspace-cargo.toml"]
 
 
 [conditional.'use_workspace == false']
-ignore = ["target", "crates", "README.md"]
+ignore = ["target", "crates", "README.md", "LICENSE-MIT", "LICENSE-APACHE", "workspace-cargo.toml"]
 include = ["src/*", "Cargo.toml"]
 
 [hooks]

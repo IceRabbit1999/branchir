@@ -1,0 +1,7 @@
+[package]
+name = "branchir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ir_aquila = "0.0.2"

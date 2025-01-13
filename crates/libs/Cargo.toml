@@ -4,4 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ir_aquila.workspace = true
+snafu.workspace = true
+macros = { path = "../macros" }
+common = { path = "../common" }

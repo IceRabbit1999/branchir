@@ -4,6 +4,5 @@ resolver = "2"
 
 members = ["crates/*"]
 
-[dependencies]
-ir_aquila = "0.0.2"
+[workspace.dependencies]
 snafu = "0.8.5"

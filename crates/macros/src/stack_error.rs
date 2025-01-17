@@ -1,29 +1,60 @@
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::{quote, quote_spanned, ToTokens};
-use syn2::{parenthesized, spanned::Spanned, Attribute, Ident, ItemEnum, Variant};
+use syn2::{parenthesized, parse::ParseStream, spanned::Spanned, Attribute, Ident, ItemEnum, Variant};
+
+struct StackErrorArgs {
+    path: syn2::Path,
+}
+
+impl syn2::parse::Parse for StackErrorArgs {
+    fn parse(input: ParseStream) -> syn2::Result<Self> {
+        if input.is_empty() {
+            return Ok(StackErrorArgs {
+                path: syn2::parse_quote!(libs::StackError),
+            });
+        }
+
+        let ident: Ident = input.parse()?;
+        if ident != "path" {
+            return Err(syn2::Error::new(ident.span(), "expected `path`"));
+        }
+
+        let content;
+        parenthesized!(content in input);
+        let path: syn2::Path = content.parse()?;
+
+        Ok(StackErrorArgs { path })
+    }
+}
 
 pub fn stack_trace_style_impl(args: TokenStream2, input: TokenStream2) -> TokenStream2 {
-    let input_cloned: TokenStream2 = input.clone();
 
-    let error_enum_definition: ItemEnum = syn2::parse2(input_cloned).unwrap();
-    let enum_name = error_enum_definition.ident;
+    let trait_path = match syn2::parse2::<StackErrorArgs>(args) {
+        Ok(args) => args.path,
+        Err(_) => syn2::parse_quote!(libs::StackError),
+    };
 
+    let item_enum = match syn2::parse2::<ItemEnum>(input.clone()) {
+        Ok(item) => item,
+        Err(e) => return e.to_compile_error(),
+    };
+
+    let enum_name = item_enum.ident;
     let mut variants = vec![];
 
-    for error_variant in error_enum_definition.variants {
+    for error_variant in item_enum.variants {
         let variant = ErrorVariant::from_enum_variant(error_variant);
         variants.push(variant);
     }
 
     let debug_fmt_fn = build_debug_fmt_impl(enum_name.clone(), variants.clone());
-    let next_fn = build_next_impl(enum_name.clone(), variants);
-    let debug_impl = build_debug_impl(enum_name.clone());
+    let next_fn = build_next_impl(enum_name.clone(), variants, &trait_path);
+    let debug_impl = build_debug_impl(enum_name.clone(), &trait_path);
 
     quote! {
-        #args
         #input
 
-        impl common::StackError for #enum_name {
+        impl #trait_path for #enum_name {
             #debug_fmt_fn
             #next_fn
         }
@@ -45,11 +76,11 @@ fn build_debug_fmt_impl(enum_name: Ident, variants: Vec<ErrorVariant>) -> TokenS
     }
 }
 
-fn build_next_impl(enum_name: Ident, variants: Vec<ErrorVariant>) -> TokenStream2 {
+fn build_next_impl(enum_name: Ident, variants: Vec<ErrorVariant>, path: &syn2::Path) -> TokenStream2 {
     let match_arms = variants.iter().map(|v| v.to_next_match_arm()).collect::<Vec<_>>();
 
     quote! {
-        fn next(&self) -> Option<&dyn common::StackError> {
+        fn next(&self) -> Option<&dyn #path> {
             use #enum_name::*;
             match self {
                 #(#match_arms)*
@@ -58,11 +89,11 @@ fn build_next_impl(enum_name: Ident, variants: Vec<ErrorVariant>) -> TokenStream
     }
 }
 
-fn build_debug_impl(enum_name: Ident) -> TokenStream2 {
+fn build_debug_impl(enum_name: Ident, path: &syn2::Path) -> TokenStream2 {
     quote! {
         impl std::fmt::Debug for #enum_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                use common::StackError;
+                use #path;
                 let mut buf = vec![];
                 self.debug_fmt(0, &mut buf);
                 write!(f, "{}", buf.join("\n"))
